@@ -42,7 +42,7 @@
       <div class="grid">
         <div><label>ประเภทช็อต</label><select id="shotType"><option value="approach">Approach</option><option value="layup">Layup</option><option value="recovery">Recovery / Punch</option><option value="tee">Tee Shot</option><option value="short">Short Game</option></select></div>
         <div><label>Lie</label><select id="lie"><option>แฟร์เวย์</option><option>รัฟท์ (บาง)</option><option>รัฟท์ (หนา)</option><option>บังเกอร์ข้างกรีน</option><option>บังเกอร์แฟร์เวย์</option><option>ฟรินจ์/เอพพโรช</option><option>ทีออฟ</option></select></div>
-        <div><label>ระยะถึงเป้า (เมตร)</label><input id="dist" type="number" min="5" max="260" value="120" /></div>
+        <div><label>ระยะถึงเป้า (หลา / yards)</label><input id="dist" type="number" min="5" max="320" value="120" /></div>
         <div><label>ความชัน Y</label><select id="slopeY"><option value="flat">พื้นราบ</option><option value="up_lite">ขึ้นเล็กน้อย</option><option value="up_big">ขึ้นมาก</option><option value="down_lite">ลงเล็กน้อย</option><option value="down_big">ลงมาก</option></select></div>
         <div><label>ลูกสูง/ต่ำกว่าเท้า</label><select id="slopeX"><option value="level">ระดับเดียวกับเท้า</option><option value="above_lite">ลูกสูงกว่าเล็กน้อย</option><option value="above_big">ลูกสูงกว่ามาก</option><option value="below_lite">ลูกต่ำกว่าเล็กน้อย</option><option value="below_big">ลูกต่ำกว่ามาก</option></select></div>
         <div><label>ลม</label><select id="wind"><option value="calm">ลมสงบ</option><option value="head_lite">ลมต้านเล็กน้อย</option><option value="head_big">ลมต้านแรง</option><option value="tail_lite">ลมตามเล็กน้อย</option><option value="tail_big">ลมตามแรง</option><option value="cross_l2r">ขวาง ซ้าย→ขวา</option><option value="cross_r2l">ขวาง ขวา→ซ้าย</option></select></div>
@@ -73,7 +73,7 @@
       <div class="grid">
         <div><label>ผลหลัก</label><select id="res_main"><option value="hit">โดนตามแผน</option><option value="short">สั้น</option><option value="long">ยาว</option><option value="left">ซ้าย</option><option value="right">ขวา</option><option value="fat">Fat</option><option value="thin">Thin</option><option value="bunker">ลงบังเกอร์</option></select></div>
         <div><label>รูปทรงบอล</label><select id="ball_shape"><option value="straight">ตรง</option><option value="draw">Draw</option><option value="fade">Fade</option><option value="hook">Hook</option><option value="slice">Slice</option></select></div>
-        <div><label>พลาดระยะ (ม.)</label><input id="miss_m" type="number" value="0" /></div>
+        <div><label>พลาดระยะ (หลา)</label><input id="miss_m" type="number" value="0" /></div>
       </div>
       <div class="row" style="margin-top:10px"><button onclick="saveResult()">บันทึกผลลัพธ์</button><div style="text-align:right"><span class="small" id="logCount">logs: 0</span></div></div>
     </div>
@@ -227,9 +227,12 @@ const rules = [
 
   s=> (s.pin==="left"||s.pin==="right") && ["aim_center_bias"],
 
-  // ระยะเสริม
-  s=> (s.dist<=40 && s.lie!=="บังเกอร์แฟร์เวย์") && ["short_back_long_through","weight_forward","hands_forward"],
-  s=> (s.dist>=170 && s.lie!=="บังเกอร์ข้างกรีน") && ["swing_smooth"]
+  // ระยะเสริม (yards)
+  s=> (s.dist<=45 && s.lie!=="บังเกอร์แฟร์เวย์") && ["short_back_long_through","weight_forward","hands_forward"],
+  // Pitch zone 50–90 yards
+  s=> (s.dist>=50 && s.dist<=90 && s.lie!=="บังเกอร์แฟร์เวย์") && ["ball_center","swing_smooth","commit_speed","control_spin"],
+  // Long shot helper keeps tempo relaxed
+  s=> (s.dist>=185 && s.lie!=="บังเกอร์ข้างกรีน") && ["swing_smooth"]
 ];
 
 function getState(){
@@ -359,11 +362,8 @@ function lineText(tokens){
 function applySafetyBias(state, tokens){
   const risky = state.obs!=="none" || state.stance==="unstable" || state.slopeY==="down_big" || state.slopeY==="up_big" || /หลุมลึก|OB|น้ำ|บังเกอร์/.test(state.notes||'');
   if(risky){
-    // Enforce center-aim safety without side bias; user will handle hazard-avoid aim manually
     tokens.add('aim_center_bias');
-    // Strip any side-aim tokens to keep center aim
     ['aim_left','aim_left_more','aim_right','aim_right_more'].forEach(k=> tokens.delete(k));
-    // Keep wind-start guidance and tempo/carry safety
     tokens.add('swing_smooth');
     tokens.add('take_enough_carry');
   }
@@ -408,7 +408,7 @@ function saveResult(){
   document.getElementById('logCount').textContent='logs: '+logs.length;
 }
 
-function exportData(){ const data={version:'pro-2.4', weights:getWeights(), logs:getLogs()}; const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='golf_shot_profile.json'; a.click(); URL.revokeObjectURL(url); }
+function exportData(){ const data={version:'pro-2.5y', weights:getWeights(), logs:getLogs()}; const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='golf_shot_profile.json'; a.click(); URL.revokeObjectURL(url); }
 function importData(){ const i=document.createElement('input'); i.type='file'; i.accept='application/json'; i.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d.weights) setWeights(d.weights); if(d.logs) setLogs(d.logs); alert('นำเข้าสำเร็จ'); document.getElementById('score').textContent='โปรไฟล์: '+profScore(); document.getElementById('logCount').textContent='logs: '+getLogs().length; }catch(err){ alert('ไฟล์ไม่ถูกต้อง'); } }; r.readAsText(f); }; i.click(); }
 function clearData(){ if(confirm('ล้างการเรียนรู้ทั้งหมด?')){ localStorage.removeItem(KEY); localStorage.removeItem(LOG); document.getElementById('score').textContent='โปรไฟล์: 0'; document.getElementById('logCount').textContent='logs: 0'; alert('ล้างแล้ว'); } }
 function resetForm(){ for(const id of ['shotType','lie','slopeY','slopeX','wind','ball','turf','obs','stance','pin','green']) document.getElementById(id).selectedIndex=0; document.getElementById('dist').value=120; document.getElementById('notes').value=''; document.getElementById('output').textContent='เลือกสภาพด้านบน แล้วกด “แนะนำวิธีตี”'; document.getElementById('tags').innerHTML=''; document.getElementById('why').textContent=''; }
@@ -426,7 +426,7 @@ function runTests(){
   s={...s, wind:'head_big', slopeY:'up_big'}; raw=gatherTokens(s); rz=resolveTokens(raw.tokens);
   out.push(A('B1 net club >= +1.5', Math.round(rz.clubAdj*2)/2 >= 1.5));
 
-  // C: Downhill big → net down >= 0.5 and traj high/neutral
+  // C: Downhill big → net down >= 0.5
   s={...s, wind:'calm', slopeY:'down_big'}; raw=gatherTokens(s); rz=resolveTokens(raw.tokens);
   out.push(A('C1 net club <= -0.5', Math.round(rz.clubAdj*2)/2 <= -0.5));
 
@@ -456,6 +456,12 @@ function runTests(){
   applySafetyBias(s,ti); // risky due to obs
   out.push(A('I1 safety removes side aim', !ti.has('aim_left') && !ti.has('aim_left_more') && !ti.has('aim_right') && !ti.has('aim_right_more')));
   out.push(A('I2 still has aim_center_bias', ti.has('aim_center_bias')));
+
+  // J: Pitch zone 60 yards on fairway
+  s={shotType:'approach', lie:'แฟร์เวย์', dist:60, slopeY:'flat', slopeX:'level', wind:'calm', ball:'normal', turf:'normal', obs:'none', stance:'stable', pin:'center', green:'normal', notes:'', time:new Date().toISOString()};
+  raw=gatherTokens(s); rz=resolveTokens(raw.tokens);
+  out.push(A('J1 pitch zone active (ball_center)', rz.tokens.includes('ball_center')));
+  out.push(A('J2 pitch zone includes commit_speed', rz.tokens.includes('commit_speed')));
 
   const lines = out.map(x=> (x.pass?'✅':'❌')+' '+x.name);
   const fails = out.filter(x=>!x.pass);
